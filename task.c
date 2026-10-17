@@ -1,71 +1,3 @@
-//#include"function.h"
-//
-//unsigned char jar_present;
-//unsigned char olp_present;
-//
-//unsigned char Red_solid;
-//unsigned char Red_Blink;
-//unsigned char White_solid;
-//unsigned int jar_val;
-//unsigned int olp_val;
-//void Inputs_Task(void)
-//{
-//  Tick_Wait();                /* one sample pair per ~1 ms */
-//  if(ADC_Read(OLP_CH) >= 2048)
-//  {
-//  	jar_present = 0;
-//  	olp_present = 1;
-//  }
-//  else if(ADC_Read(JAR_CH) >= 2048)
-//  {
-//  	jar_present = 1;
-//  	olp_present = 0;
-//  }
-//  if(olp_present == 1)
-//  {
-//  	if(jar_present == 1)
-//  	{
-//  		White_solid = 1;
-//  		if(olp_present == 0)
-//  		{
-//  			jar_present = 0;
-//  			
-//  			Red_Blink = 1;
-//  		}
-//  	}
-//  	else
-//  	{
-//  		Red_solid = 1;
-//  	}
-//  }
-//  else
-//  {
-//  	Red_Blink = 1;
-//  }
-//				
-//}
-//
-//void Led_Task(void)
-//{
-//	if(Red_solid == 1)
-//	{
-//		LED_SetAll(0, 0, 0);
-//		LED_SetAll(0, 255, 0); 
-//	}
-//	else if(White_solid == 1)
-//	{
-//		LED_SetAll(0, 0, 0);
-//		LED_SetAll(255, 255, 255);
-//	}
-//	else if(Red_Blink == 1)
-//	{
-//		LED_SetAll(0, 0, 0);
-//		LED_SetAll(0, 0, 255);
-//	}
-//			
-//}
-
-
 #include "function.h"
 
 /* Actual definitions: exactly one copy in the project */
@@ -85,6 +17,10 @@ void Inputs_Task(void)
     unsigned int jar_adc;
     unsigned int olp_adc;
 
+    static unsigned int jar_peak = 0U;
+    static unsigned int olp_peak = 0U;
+    static unsigned char window = 0U;
+
     /* Wait for one timer event */
     Tick_Wait();
 
@@ -92,26 +28,43 @@ void Inputs_Task(void)
     jar_adc = ADC_Read(JAR_CH);
     olp_adc = ADC_Read(OLP_CH);
 
-    /*
-     * Assumption:
-     * ADC >= threshold means input is active.
-     */
-    if (jar_adc >= ADC_THRESHOLD)
+    /* Hold the highest value seen in this window */
+    if (jar_adc > jar_peak)
     {
-        jar_present = 1U;
+        jar_peak = jar_adc;
     }
-    else
+    if (olp_adc > olp_peak)
     {
-        jar_present = 0U;
+        olp_peak = olp_adc;
     }
 
-    if (olp_adc >= ADC_THRESHOLD)
+    window++;
+
+    /* ~25 ms window = more than one 50 Hz cycle (20 ms) */
+    if (window >= 25U)
     {
-        olp_present = 1U;
-    }
-    else
-    {
-        olp_present = 0U;
+        window = 0U;
+
+        if (jar_peak >= ADC_THRESHOLD)
+        {
+            jar_present = 1U;
+        }
+        else
+        {
+            jar_present = 0U;
+        }
+
+        if (olp_peak >= ADC_THRESHOLD)
+        {
+            olp_present = 1U;
+        }
+        else
+        {
+            olp_present = 0U;
+        }
+
+        jar_peak = 0U;
+        olp_peak = 0U;
     }
 }
 
@@ -184,15 +137,16 @@ void Led_Task(void)
 
         if (output == LED_WHITE_SOLID)
         {
-            LED_SetAll(255U, 255U, 255U);
+            LED_SetAll(255, 255, 255);
+            //LED_SetAll(100, 150, 200);
         }
         else if (output == LED_RED_SOLID)
         {
-            LED_SetAll(0u, 255u, 0U);
+            LED_SetAll(0, 255, 0);
         }
         else
         {
-            LED_SetAll(0U, 0U, 0U);
+            LED_SetAll(0, 0, 0);
         }
     }
 }
