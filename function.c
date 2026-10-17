@@ -105,134 +105,17 @@ void LED_SetAll(unsigned char red,
 {
     unsigned char i;
 
+    unsigned char emi_state;
+
+    emi_state = _emi;          /* save global interrupt state */
+    _emi = 0;
+    
     for(i = 0; i < LED_COUNT; i++)
     {
         LED_SendRGB(red, green, blue);
     }
+    _emi = emi_state;          /* restore before the long reset low */
 
     LED_Reset();
 }
 
-/*=========================================================
-  FILL TRAIN
- 
-  LED0 lights first, then LED1 while LED0 stays on, then LED2
-  while LED0/LED1 stay on ... until all 9 are lit ("carriages"
-  joining one by one). The full strip then holds, switches
-  off, and the fill restarts.
- 
-  One call = one complete fill + hold + off cycle. Call this
-  in a loop from main().
-=========================================================*/
-void LED_TrainFill(unsigned char red,
-                    unsigned char green,
-                    unsigned char blue,
-                    unsigned int  step_delay_ms,
-                    unsigned int  hold_ms,
-                    unsigned int  off_ms)
-{
-    unsigned char lit_count;   /* how many LEDs, counting from LED0, are ON */
-    unsigned char i;
- 
-    /* Grow the lit section one LED at a time */
-    for(lit_count = 1; lit_count <= LED_COUNT; lit_count++)
-    {
-        for(i = 0; i < LED_COUNT; i++)
-        {
-            /*if(i < lit_count)*/
-            if(i >= LED_COUNT - lit_count) //Reverse LED
-            {
-                LED_SendRGB(red, green, blue);
-            }
-            else
-            {
-                LED_SendRGB(0, 0, 0);
-            }
-        }
-        LED_Reset();
- 
-        Delay_ms(step_delay_ms);
-    }
- 
-    /* Whole strip lit - hold */
-    Delay_ms(hold_ms);
- 
-    /* All off, then pause before the next fill */
-    LED_SetAll(0, 0, 0);
-    Delay_ms(off_ms);
-}
-
-
-/*=========================================================
-  TRAIN / CHASE EFFECT
- 
-  A bright "head" pixel at head_pos, followed by a fading
-  tail of tail_len pixels, wrapping around the 9-LED ring.
-  Head->tail direction follows increasing index, i.e. the
-  train appears to move from LED0 towards LED8 and then
-  wraps back to LED0.
- 
-  tail_len is clamped to 4, since brightness is halved per
-  step (>>1, >>2, >>3) and a 4th step would already be 1/8.
-  Anything beyond that distance behind the head is OFF.
- 
-  This only changes what colour data is shifted out - the
-  bit timing is unchanged (still LED_BIT_0()/LED_BIT_1()).
-=========================================================*/
-void LED_ShowTrain(unsigned char head_pos,
-                    unsigned char red,
-                    unsigned char green,
-                    unsigned char blue,
-                    unsigned char tail_len)
-{
-    unsigned char i;
-    signed char   diff;
-    unsigned char r, g, b;
- 
-    if(tail_len > 4) tail_len = 4;
- 
-    for(i = 0; i < LED_COUNT; i++)
-    {
-        /* Circular distance behind the head, 0 = head itself */
-        diff = (signed char)head_pos - (signed char)i;
-        if(diff < 0)
-        {
-            diff += LED_COUNT;
-        }
- 
-        if(diff < tail_len)
-        {
-            /* diff 0 -> full, 1 -> half, 2 -> quarter, 3 -> 1/8 */
-            r = red   >> diff;
-            g = green >> diff;
-            b = blue  >> diff;
-        }
-        else
-        {
-            r = 0; g = 0; b = 0;
-        }
- 
-        LED_SendRGB(r, g, b);
-    }
- 
-    LED_Reset();
-}
- 
-/*=========================================================
-  Runs the train once all the way around the ring, one call
-  per animation step. Call this in a loop from main().
-=========================================================*/
-void LED_TrainPattern(unsigned char red,
-                       unsigned char green,
-                       unsigned char blue,
-                       unsigned char tail_len,
-                       unsigned int  step_delay_ms)
-{
-    unsigned char pos;
- 
-    for(pos = 0; pos < LED_COUNT; pos++)
-    {
-        LED_ShowTrain(pos, red, green, blue, tail_len);
-        Delay_ms(step_delay_ms);
-    }
-}
